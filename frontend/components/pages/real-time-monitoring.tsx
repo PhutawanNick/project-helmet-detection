@@ -3,8 +3,23 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle, BikeIcon, Camera, Car, CheckCircle, Clock, Eye, EyeOff, Users } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { AlertTriangle, BikeIcon, Camera, Car, CheckCircle, Clock, Eye, EyeOff, Users, Maximize, Minimize } from "lucide-react"
+import React, { useEffect, useState, useCallback } from "react"
+
+// We fetch real detection history from the backend instead of using mocks
+
+// Small clock component that updates every second. Kept isolated so the parent
+// RealTimeMonitoring component does not re-render every tick.
+function NowClock() {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  return <>{now.toLocaleTimeString('th-TH')}</>
+}
 
 interface DetectionResult {
   id: string
@@ -13,7 +28,7 @@ interface DetectionResult {
   licensePlate: string
   helmetStatus: "wearing" | "not-wearing"
   passengerCount: number
-  confidence: number
+  // confidence: number
   imageUrl?: string
 }
 
@@ -71,133 +86,152 @@ const createMockDetection = (): DetectionResult => {
 export function RealTimeMonitoring() {
   const [detections, setDetections] = useState<DetectionResult[]>([])
   const [isRecording, setIsRecording] = useState(true)
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [useMockData, setUseMockData] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Fetch helmet detection data from API
-  const fetchDetectionData = useCallback(async (abortController?: AbortController) => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
-      
-      // Use provided controller or create new one
-      const controller = abortController || new AbortController()
-      let timeoutId: NodeJS.Timeout | undefined
-      
-      // Only set timeout if we created the controller
-      if (!abortController) {
-        timeoutId = setTimeout(() => {
-          controller.abort()
-        }, 10000) // 10 second timeout
+  // Handle fullscreen functionality
+  // Make toggleFullscreen stable so it doesn't change every render
+  const toggleFullscreen = useCallback(() => {
+    const containerElement = document.getElementById('video-container') as HTMLDivElement | null
+    if (!containerElement) return
+
+    if (!document.fullscreenElement) {
+      if (containerElement.requestFullscreen) {
+        containerElement.requestFullscreen()
+      } else if ((containerElement as any).webkitRequestFullscreen) {
+        (containerElement as any).webkitRequestFullscreen()
+      } else if ((containerElement as any).msRequestFullscreen) {
+        (containerElement as any).msRequestFullscreen()
       }
-      
-      const response = await fetch(`${base}/analysis/helmet`, {
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      // Clear timeout if we set it
-      if (timeoutId) {
-        clearTimeout(timeoutId)
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen()
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen()
       }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const apiData: ApiResponse = await response.json()
-      
-      if (apiData.success) {
-        const newDetection = transformApiResponse(apiData)
-        setDetections(prev => [newDetection, ...prev.slice(0, 9)]) // Keep last 10 detections
-        
-        // Reset mock data flag on successful fetch
-        if (useMockData) {
-          setUseMockData(false)
-        }
-      } else {
-        throw new Error('API returned success: false')
-      }
-    } catch (error) {
-      // Only handle error if it's not an abort from component cleanup
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('Request aborted:', abortController ? 'Component cleanup' : 'Timeout')
-        
-        // Check if this is a timeout or component unmount
-        if (!abortController) {
-          setError('Request timeout - Using mock data')
-        }
-        // Don't set error for component unmount (when abortController is provided)
-        return
-      }
-      
-      console.error('Error fetching detection data:', error)
-      
-      // Use mock data as fallback if backend is not available
-      if (!useMockData) {
-        const mockDetection = createMockDetection()
-        setDetections(prev => [mockDetection, ...prev.slice(0, 9)])
-        setUseMockData(true)
-      }
-      
-      if (error instanceof Error) {
-        if (error.message.includes('fetch')) {
-          setError('Backend unavailable - Using mock data')
-        } else {
-          setError(`${error.message} - Using mock data`)
-        }
-      } else {
-        setError('Unknown error - Using mock data')
-      }
-    } finally {
-      setLoading(false)
     }
-  }, [useMockData]) // Dependencies for useCallback
-
-  // Update current time every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-
-    return () => clearInterval(timer)
   }, [])
 
-  // Fetch detection data periodically when recording
+  // Listen for fullscreen changes and keyboard shortcuts. We avoid closing over
+  // changing state (like isFullscreen or mjpegUrl) by querying the DOM/document
+  // directly when handling keys.
   useEffect(() => {
-    if (!isRecording) return
-
-    // Create abort controller for this effect
-    const abortController = new AbortController()
-    
-    // Fetch immediately when starting
-    fetchDetectionData(abortController)
-
-    // Then fetch every 3 seconds
-    const interval = setInterval(() => {
-      if (!abortController.signal.aborted) {
-        fetchDetectionData(abortController)
-      }
-    }, 3000)
-
-    // Cleanup function
-    return () => {
-      clearInterval(interval)
-      abortController.abort() // Cancel any ongoing requests
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
     }
-  }, [isRecording, useMockData]) // Add useMockData to dependencies
 
-  // Show MJPEG stream by setting the image src
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('msfullscreenchange', handleFullscreenChange)
+
+    // Add CSS for fullscreen
+    const style = document.createElement('style')
+    style.textContent = `
+      #video-container:fullscreen {
+        background: black;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #video-container:-webkit-full-screen {
+        background: black;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #video-container:-moz-full-screen {
+        background: black;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    `
+    document.head.appendChild(style)
+
+    // Handle keyboard shortcuts without reading stale closures
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (document.fullscreenElement) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen()
+          } else if ((document as any).webkitExitFullscreen) {
+            (document as any).webkitExitFullscreen()
+          }
+        }
+      }
+      if (event.key.toLowerCase() === 'f') {
+        // If the MJPEG element exists, toggle fullscreen on its container
+        const mjpegEl = document.getElementById('mjpeg-stream')
+        const container = document.getElementById('video-container')
+        if (mjpegEl && container && !document.fullscreenElement) {
+          if ((container as any).requestFullscreen) {
+            (container as any).requestFullscreen()
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyPress)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('keydown', handleKeyPress)
+      document.head.removeChild(style)
+    }
+  }, [])
+
+  // NOTE: we move the per-second clock into a small component below so the
+  // whole page doesn't re-render every second.
+
+  // Show MJPEG stream by setting the image src. Use env var if provided; otherwise use relative path.
   const [mjpegUrl, setMjpegUrl] = useState<string | undefined>(undefined)
 
+  // Poll backend for history records and map them to DetectionResult
   useEffect(() => {
-    // Set MJPEG stream URL for video display only
+    let mounted = true
+    const controller = new AbortController()
+    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+
+    const mapHistoryToDetection = (h: any): DetectionResult => ({
+      id: h.id ?? `id_${Math.random().toString(36).slice(2, 9)}`,
+      timestamp: h.timestamp ?? new Date().toLocaleString('th-TH'),
+      camera: 'กล้องหลัก',
+      licensePlate: '',
+      helmetStatus: h.helmet_status === true ? 'wearing' : 'not-wearing',
+      passengerCount: typeof h.passenger_count === 'number' ? h.passenger_count : 1,
+      imageUrl: undefined,
+    })
+
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`${base}/helmet/history?limit=20`, { signal: controller.signal })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (!mounted) return
+        const items = Array.isArray(data) ? data.map(mapHistoryToDetection) : []
+        setDetections(items)
+      } catch (e) {
+        // ignore abort errors
+        if ((e as any).name === 'AbortError') return
+        console.warn('Failed to fetch history:', e)
+      }
+    }
+
+    fetchHistory()
+    const t = setInterval(fetchHistory, 5000)
+    return () => {
+      mounted = false
+      controller.abort()
+      clearInterval(t)
+    }
+  }, [])
+
+  useEffect(() => {
+    
+    // New simple approach: use <img> with MJPEG URL
     const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
     const streamUrl = `${base}/helmet/detect`
     console.log('MJPEG Stream URL:', streamUrl)
@@ -220,7 +254,7 @@ export function RealTimeMonitoring() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">การตรวจสอบแบบ Real-time</h2>
-          <p className="text-muted-foreground">อัปเดตล่าสุด: {currentTime.toLocaleTimeString("th-TH")}</p>
+          <p className="text-muted-foreground">อัปเดตล่าสุด: <NowClock /></p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -245,35 +279,7 @@ export function RealTimeMonitoring() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">การกระทำผิดวันนี้</p>
-                <p className="text-2xl font-bold text-foreground">{todayViolations}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">อัตราการปฏิบัติตาม</p>
-                <p className="text-2xl font-bold text-foreground">{complianceRate}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
+          <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -302,6 +308,34 @@ export function RealTimeMonitoring() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">การกระทำผิดวันนี้</p>
+                <p className="text-2xl font-bold text-foreground">{todayViolations}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">อัตราการปฏิบัติตาม</p>
+                <p className="text-2xl font-bold text-foreground">{complianceRate}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Video Feeds */}
@@ -317,19 +351,70 @@ export function RealTimeMonitoring() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
+            <div 
+              id="video-container"
+              className={`aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group ${
+                isFullscreen ? 'fixed inset-0 z-50 bg-black rounded-none aspect-auto' : ''
+              }`}
+            >
               {mjpegUrl ? (
-                <img id="mjpeg-stream" src={mjpegUrl} alt="Live MJPEG" className="absolute inset-0 w-full h-full object-cover" />
+                <img 
+                  id="mjpeg-stream" 
+                  src={mjpegUrl} 
+                  alt="Live MJPEG" 
+                  className={`absolute inset-0 w-full h-full object-cover ${
+                    isFullscreen ? 'object-contain' : 'object-cover'
+                  }`} 
+                />
               ) : (
                 <div className="relative z-10 text-center">
                   <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                   <span className="text-muted-foreground">Live Video Feed</span>
                 </div>
               )}
-              <div className="absolute top-3 right-3 flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded text-xs">
+              
+              {/* Recording indicator */}
+              <div className="absolute top-3 left-3 flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded text-xs z-20">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                 REC
               </div>
+
+              {/* Fullscreen button */}
+              {mjpegUrl && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={toggleFullscreen}
+                  className="absolute top-3 right-3 z-20 transition-opacity"
+                  title={isFullscreen ? "ออกจากเต็มจอ" : "ดูเต็มจอ"}
+                >
+                  {isFullscreen ? (
+                    <Minimize className="h-4 w-4" />
+                  ) : (
+                    <Maximize className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+
+              {/* Fullscreen controls */}
+              {isFullscreen && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20">
+                  <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span>กล้องหลัก - ตรวจจับผู้ขับขี่</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={toggleFullscreen}
+                      className="text-white hover:text-white hover:bg-white/20"
+                    >
+                      <Minimize className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -345,16 +430,42 @@ export function RealTimeMonitoring() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-blue-500/20"></div>
-              <div className="relative z-10 text-center">
-                <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                <span className="text-muted-foreground">Live Video Feed</span>
-              </div>
-              <div className="absolute top-3 right-3 flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded text-xs">
+            <div 
+              id="video-container-2"
+              className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group"
+            >
+              <img 
+                id="static-image" 
+                src="/f.jpg" 
+                alt="License Plate Detection" 
+                className="absolute inset-0 w-full h-full object-cover" 
+              />
+              
+              {/* Recording indicator */}
+              <div className="absolute top-3 left-3 flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded text-xs z-20">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                 REC
               </div>
+
+              {/* Fullscreen button */}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const img = document.getElementById('static-image') as HTMLImageElement
+                  if (img.requestFullscreen) {
+                    img.requestFullscreen()
+                  } else if ((img as any).webkitRequestFullscreen) {
+                    (img as any).webkitRequestFullscreen()
+                  } else if ((img as any).msRequestFullscreen) {
+                    (img as any).msRequestFullscreen()
+                  }
+                }}
+                className="absolute top-3 right-3 z-20 transition-opacity"
+                title="ดูเต็มจอ"
+              >
+                <Maximize className="h-4 w-4" />
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -409,9 +520,9 @@ export function RealTimeMonitoring() {
                     )}
                   </div>
 
-                  <Badge variant="outline" className="text-xs">
+                  {/* <Badge variant="outline" className="text-xs">
                     {detection.confidence}% แม่นยำ
-                  </Badge>
+                  </Badge> */}
 
                   <span className="text-xs text-muted-foreground">{detection.camera}</span>
                 </div>
