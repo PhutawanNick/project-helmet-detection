@@ -103,9 +103,13 @@ class CameraHub:
             self._stop_if_idle()
 
     def _ensure_running(self) -> None:
-        if self._thread is None or not self._thread.is_alive():
-            self._stop_event.clear()
+        self._stop_event.clear()
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
             self._loop = asyncio.get_event_loop()
+
+        if self._thread is None or not self._thread.is_alive():
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
             logger.info("Camera capture thread started")
@@ -407,7 +411,20 @@ class CameraHub:
         finally:
             if cap is not None:
                 cap.release()
+            if grab_thread is not None and grab_thread.is_alive():
+                grab_thread.join(timeout=1.0)
             logger.info("Video processing stopped")
+
+            with self._lock:
+                self._thread = None
+                # If new subscribers arrived while shutting down, restart worker thread
+                if self._frame_subs or self._detect_subs:
+                    self._stop_event.clear()
+                    self._thread = threading.Thread(target=self._run, daemon=True)
+                    self._thread.start()
+                    logger.info(
+                        "Camera capture thread restarted for pending subscribers"
+                    )
 
 
 # Module-level singleton — one camera per process
