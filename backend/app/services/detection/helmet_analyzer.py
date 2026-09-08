@@ -67,10 +67,12 @@ def classify(labels: list[str], on_label: str) -> tuple[bool, bool, bool]:
 
     No labels means nobody was detected: not compliant, but also no proof of a
     violation, so the record reads NOT_DETECTED.
+    A violation occurs if any rider is not wearing a helmet or if passengers exceed MAX_PASSENGERS.
     """
     helmet_status = all(label == on_label for label in labels) if labels else False
-    violation = bool(labels) and not helmet_status
-    return helmet_status, len(labels) > MAX_PASSENGERS, violation
+    over_capacity = len(labels) > MAX_PASSENGERS
+    violation = (bool(labels) and not helmet_status) or over_capacity
+    return helmet_status, over_capacity, violation
 
 
 class HelmetAnalyzer:

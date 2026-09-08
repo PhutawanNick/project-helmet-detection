@@ -216,7 +216,7 @@ class TestHelmetVerdict:
 
         assert helmet_status is True
         assert over_capacity is True
-        assert violation is False
+        assert violation is True
 
 
 class TestLineCrossing:
