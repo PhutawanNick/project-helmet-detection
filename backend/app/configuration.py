@@ -93,7 +93,6 @@ class ApplicationSettingsConfig:
     read_timeout_ms: int = 10000
 
     @staticmethod
-    @staticmethod
     def from_dict(data: dict) -> "ApplicationSettingsConfig":
         rtsp_override = os.environ.get("RTSP_VIDEO_PATH", "").strip()
 

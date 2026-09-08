@@ -52,7 +52,9 @@ function FloatingStatsStack({
   t: (key: string) => string
 }) {
   const stats = useMemo(() => {
-    const violations = detections.filter((d) => d.helmetStatus === "not-wearing").length
+    const violations = detections.filter(
+      (d) => d.violation || d.helmetStatus === "not-wearing"
+    ).length
     const total = detections.length
     const compliance = total > 0 ? Math.round(((total - violations) / total) * 100) : 0
     const overCapacity = detections.filter((d) => d.passengerCount > 2).length
