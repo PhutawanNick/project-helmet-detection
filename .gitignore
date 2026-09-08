@@ -71,6 +71,9 @@ cover/
 /snapshots/
 /src/case/
 /src/image/
+/src/testplate/*.jpg
+/src/testplate/*.jpeg
+/src/testplate/*.png
 /benchmark/results
 # FastAPI / Env
 .env
