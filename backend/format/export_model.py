@@ -71,3 +71,4 @@ for pt, size, out in jobs:
             Path(result).replace(out)  # ultralytics always writes next to the .pt
             result = out
     print(f"{pt} -> {result} (imgsz={size}, classes={YOLO(result).names})")
+

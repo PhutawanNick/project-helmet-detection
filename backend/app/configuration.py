@@ -86,17 +86,16 @@ class ApplicationSettingsConfig:
     video_path: str
     use_webcam: bool
     webcam_id: int
+    rtsp_transport: str = "tcp"
+    rtsp_buffer_size: int = 1024
+    reconnect_delay_seconds: float = 2.0
+    open_timeout_ms: int = 10000
+    read_timeout_ms: int = 10000
 
     @staticmethod
+    @staticmethod
     def from_dict(data: dict) -> "ApplicationSettingsConfig":
-        # RTSP_VIDEO_PATH env overrides config.json and forces use_webcam=False
         rtsp_override = os.environ.get("RTSP_VIDEO_PATH", "").strip()
-        if rtsp_override:
-            return ApplicationSettingsConfig(
-                video_path=rtsp_override,
-                use_webcam=False,
-                webcam_id=data.get("webcam_id", 0),
-            )
 
         use_webcam_env = os.environ.get("USE_WEBCAM", "").strip().lower()
         if use_webcam_env in ("true", "1", "yes"):
@@ -107,14 +106,20 @@ class ApplicationSettingsConfig:
             use_webcam = data["use_webcam"]
 
         return ApplicationSettingsConfig(
-            video_path=data["video_path"],
-            use_webcam=use_webcam,
+            video_path=rtsp_override or data["video_path"],
+            use_webcam=False if rtsp_override else use_webcam,
             webcam_id=data.get("webcam_id", 0),
+            rtsp_transport=str(data.get("rtsp_transport", "tcp")),
+            rtsp_buffer_size=int(data.get("rtsp_buffer_size", 1024)),
+            reconnect_delay_seconds=float(data.get("reconnect_delay_seconds", 2.0)),
+            open_timeout_ms=int(data.get("open_timeout_ms", 10000)),
+            read_timeout_ms=int(data.get("read_timeout_ms", 10000)),
         )
 
 
 @dataclass
 class PostgresConfig:
+    database_url: str | None
     host: str
     port: int
     user: str
@@ -123,12 +128,20 @@ class PostgresConfig:
 
     @staticmethod
     def from_env() -> "PostgresConfig":
+        database_url = os.environ.get("DATABASE_URL") or os.environ.get(
+            "SUPABASE_DB_URL"
+        )
         return PostgresConfig(
-            host=os.environ.get("DATABASE_HOST", "localhost"),
-            port=int(os.environ.get("DATABASE_PORT", "5432")),
-            user=os.environ.get("DATABASE_USER", "postgres"),
-            password=os.environ.get("DATABASE_PASSWORD", "password"),
-            database=os.environ.get("DATABASE_NAME", "helmet_detection"),
+            database_url=database_url,
+            host=os.environ.get("DATABASE_HOST", os.environ.get("host", "localhost")),
+            port=int(os.environ.get("DATABASE_PORT", os.environ.get("port", "5432"))),
+            user=os.environ.get("DATABASE_USER", os.environ.get("user", "postgres")),
+            password=os.environ.get(
+                "DATABASE_PASSWORD", os.environ.get("password", "password")
+            ),
+            database=os.environ.get(
+                "DATABASE_NAME", os.environ.get("dbname", "helmet_detection")
+            ),
         )
 
 
