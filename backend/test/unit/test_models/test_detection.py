@@ -97,6 +97,22 @@ class TestDetectionRecord:
         assert record.over_capacity is True
         assert record.violation is False
 
+    def test_detection_record_not_detected(self):
+        """Test creating a detection record when no helmet is detected."""
+        record = DetectionRecord(
+            motorcycle_track_id=4,
+            helmet_status=None,
+            passenger_count=0,
+            over_capacity=False,
+            violation=False,
+        )
+
+        assert record.motorcycle_track_id == 4
+        assert record.helmet_status is None
+        assert record.passenger_count == 0
+        assert record.over_capacity is False
+        assert record.violation is False
+
     def test_detection_record_to_dict(self):
         """Test converting DetectionRecord to dictionary."""
         record = DetectionRecord(

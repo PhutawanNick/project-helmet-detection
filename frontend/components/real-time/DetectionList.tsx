@@ -1,7 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Camera, CheckCircle, Clock, Users } from "lucide-react"
+import { AlertTriangle, Camera, CheckCircle, Clock, HelpCircle, Users } from "lucide-react"
 import { memo, useRef, useState } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { DetectionModal } from "./DetectionModal"
@@ -29,6 +29,7 @@ const DetectionItem = memo(function DetectionItem({
   onImageClick: () => void
 }) {
   const isWearing = detection.helmetStatus === "wearing"
+  const isNotWearing = detection.helmetStatus === "not-wearing"
 
   return (
     <div className="group flex flex-row items-center gap-3.5 p-3 sm:p-3.5 bg-card/80 hover:bg-card border border-border/80 hover:border-border rounded-xl transition-all duration-200 shadow-xs hover:shadow-md">
@@ -66,15 +67,25 @@ const DetectionItem = memo(function DetectionItem({
                 "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border",
                 isWearing
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 animate-pulse"
+                  : isNotWearing
+                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 animate-pulse"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
               )}
             >
               {isWearing ? (
                 <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-              ) : (
+              ) : isNotWearing ? (
                 <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+              ) : (
+                <HelpCircle className="h-3.5 w-3.5 flex-shrink-0" />
               )}
-              <span>{isWearing ? t("detection.wearingHelmet") : t("detection.notWearingHelmet")}</span>
+              <span>
+                {isWearing
+                  ? t("detection.wearingHelmet")
+                  : isNotWearing
+                  ? t("detection.notWearingHelmet")
+                  : t("detection.notDetected")}
+              </span>
             </div>
           </div>
         </div>

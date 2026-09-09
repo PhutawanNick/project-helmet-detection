@@ -42,7 +42,7 @@ class DetectionRecord:
     """
 
     motorcycle_track_id: int
-    helmet_status: bool
+    helmet_status: bool | None
     passenger_count: int
     over_capacity: bool
     violation: bool

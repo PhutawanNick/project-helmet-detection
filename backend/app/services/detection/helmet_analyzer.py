@@ -62,14 +62,14 @@ def sits_on_bike(moto_box: BoundingBox, box: BoundingBox) -> bool:
     return moto_box.x1 <= box.center_x <= moto_box.x2 and box.center_y <= moto_box.y2
 
 
-def classify(labels: list[str], on_label: str) -> tuple[bool, bool, bool]:
+def classify(labels: list[str], on_label: str) -> tuple[bool | None, bool, bool]:
     """Reduce helmet labels to (helmet_status, over_capacity, violation).
 
     No labels means nobody was detected: not compliant, but also no proof of a
     violation, so the record reads NOT_DETECTED.
     A violation occurs if any rider is not wearing a helmet or if passengers exceed MAX_PASSENGERS.
     """
-    helmet_status = all(label == on_label for label in labels) if labels else False
+    helmet_status = all(label == on_label for label in labels) if labels else None
     over_capacity = len(labels) > MAX_PASSENGERS
     violation = (bool(labels) and not helmet_status) or over_capacity
     return helmet_status, over_capacity, violation
@@ -113,7 +113,7 @@ class HelmetAnalyzer:
         """
         record = DetectionRecord(
             motorcycle_track_id=track_id,
-            helmet_status=False,
+            helmet_status=None,
             passenger_count=0,
             over_capacity=False,
             violation=False,

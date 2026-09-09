@@ -11,6 +11,7 @@ import {
   Clock,
   Eye,
   EyeOff,
+  HelpCircle,
   MapPin,
   RotateCw,
   X,
@@ -55,10 +56,13 @@ function FloatingStatsStack({
     const violations = detections.filter(
       (d) => d.violation || d.helmetStatus === "not-wearing"
     ).length
+    const notDetected = detections.filter(
+      (d) => d.helmetStatus === "not-detected"
+    ).length
     const total = detections.length
     const compliance = total > 0 ? Math.round(((total - violations) / total) * 100) : 0
     const overCapacity = detections.filter((d) => d.passengerCount > 2).length
-    return { violations, total, compliance, overCapacity }
+    return { violations, notDetected, total, compliance, overCapacity }
   }, [detections])
 
   const statItems = [
@@ -84,6 +88,13 @@ function FloatingStatsStack({
       iconColor: "text-[#EF4444] dark:text-[#f87171]",
     },
     {
+      icon: HelpCircle,
+      label: t("stats.notDetected"),
+      value: isLoading ? "-" : stats.notDetected,
+      iconBg: "bg-amber-500/15 dark:bg-amber-500/20",
+      iconColor: "text-amber-600 dark:text-amber-400",
+    },
+    {
       icon: CheckCircle,
       label: t("stats.complianceRate"),
       value: isLoading ? "-" : `${stats.compliance}%`,
@@ -102,7 +113,7 @@ function FloatingStatsStack({
             <div
               key={idx}
               className={cn(
-                "group relative overflow-hidden rounded-[16px] p-3 sm:p-3.5",
+                "group relative overflow-hidden rounded-[16px] p-2.5 sm:p-3 last:col-span-2 md:last:col-span-1",
                 "bg-[rgba(255,255,255,0.88)] dark:bg-[#17181c]/90 backdrop-blur-[14px]",
                 "border border-[rgba(255,255,255,0.6)] dark:border-white/15",
                 "border-t-white/90 dark:border-t-white/30",

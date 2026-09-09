@@ -6,7 +6,7 @@ export interface DetectionResult {
   id: string
   timestamp: string
   camera: string
-  helmetStatus: "wearing" | "not-wearing"
+  helmetStatus: "wearing" | "not-wearing" | "not-detected"
   passengerCount: number
   violation: boolean
   framePath?: string  // Optional path to saved frame image
@@ -15,7 +15,7 @@ export interface DetectionResult {
 export interface DetectionHistoryItem {
   id: string
   timestamp?: string
-  helmet_status: boolean
+  helmet_status: boolean | null
   passenger_count?: number
   violation?: boolean
   frame_path?: string  // Optional path to saved frame image
@@ -23,7 +23,7 @@ export interface DetectionHistoryItem {
 
 export interface DetectionEvent {
   motorcycle_track_id: string
-  helmet_status: boolean
+  helmet_status: boolean | null
   passenger_count?: number
   violation?: boolean
   frame_path?: string

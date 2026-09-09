@@ -16,6 +16,10 @@ from ultralytics import YOLO
 
 args = sys.argv[1:]
 imgsz, fmt = 640, "onnx"
+half = False
+if "--half" in args:
+    half = True
+    args.remove("--half")
 if "--imgsz" in args:
     i = args.index("--imgsz")
     imgsz = int(args[i + 1])
@@ -56,7 +60,7 @@ else:
     jobs += [(files[i], imgsz, files[i + 1]) for i in range(0, len(files), 2)]
 
 for pt, size, out in jobs:
-    result = YOLO(pt).export(format=fmt, imgsz=size)
+    result = YOLO(pt).export(format=fmt, imgsz=size, half=half)
     if out and Path(result) != Path(out):
         # Ultralytics detects OpenVINO models by the folder name suffix.
         if fmt == "openvino" and not str(out).endswith("_openvino_model"):

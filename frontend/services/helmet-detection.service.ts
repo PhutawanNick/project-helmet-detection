@@ -15,7 +15,7 @@ import { API_BASE_URL, CAMERA_NAME } from "@/lib/api/config"
 
 /** Fields shared by history items and SSE events */
 interface RawDetection {
-  helmet_status: boolean
+  helmet_status: boolean | null
   passenger_count?: number
   violation?: boolean
   frame_path?: string
@@ -26,7 +26,12 @@ function toDetectionResult(item: RawDetection, id: string, timestamp: string): D
     id,
     timestamp,
     camera: CAMERA_NAME,
-    helmetStatus: item.helmet_status === true ? "wearing" : "not-wearing",
+    helmetStatus:
+      item.helmet_status === true
+        ? "wearing"
+        : item.helmet_status === false
+        ? "not-wearing"
+        : "not-detected",
     passengerCount: item.passenger_count ?? 1,
     violation: item.violation ?? false,
     framePath: item.frame_path,

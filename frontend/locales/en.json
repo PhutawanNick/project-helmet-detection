@@ -25,7 +25,8 @@
     "motorcyclesDetected": "Motorcycles Detected",
     "overCapacity": "Over Capacity",
     "violations": "Violations Today",
-    "complianceRate": "Compliance Rate"
+    "complianceRate": "Compliance Rate",
+    "notDetected": "Not Detected"
   },
   "camera": {
     "camera1": "Camera 1 - Rider Detection",
@@ -42,6 +43,7 @@
     "timestamp": "Time",
     "wearingHelmet": "Wearing Helmet",
     "notWearingHelmet": "Not Wearing Helmet",
+    "notDetected": "Not Detected",
     "passengers": "Passengers",
     "overCapacityBadge": "Over Capacity",
     "violation": "Violation"

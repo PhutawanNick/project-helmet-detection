@@ -196,7 +196,7 @@ class TestHelmetVerdict:
     def test_no_labels_is_not_detected(self):
         helmet_status, over_capacity, violation = classify([], "helmet on")
 
-        assert helmet_status is False
+        assert helmet_status is None
         assert over_capacity is False
         assert violation is False
 
